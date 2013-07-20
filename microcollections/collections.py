@@ -166,6 +166,7 @@ class Collection(CRUDHooks):
         from micromodels import FileField, ModelField, ModelCollectionField, FieldCollectionField
         for key, field in instance._fields.items():
             if isinstance(field, FileField):
+                field.set_serializer(self.filestore.to_serial)
                 val = getattr(instance, key)
                 setattr(instance, key, callback(val))
             elif isinstance(field, ModelField):
@@ -177,6 +178,7 @@ class Collection(CRUDHooks):
                     self._process_file_fields(val, callback)
             elif (isinstance(field, FieldCollectionField) and
                   isinstance(field._instance, FileField)):
+                field._instance.set_serializer(self.filestore.to_serial)
                 val = getattr(instance, key)
                 new_val = list()
                 for subval in val:
@@ -189,9 +191,7 @@ class Collection(CRUDHooks):
 
         #load files
         def callback(file_path):
-            if isinstance(file_path, basestring):
-                return self.filestore.load(file_path)
-            return file_path
+            return self.filestore.load(file_path)
         self._process_file_fields(instance, callback)
 
         return instance
@@ -199,9 +199,16 @@ class Collection(CRUDHooks):
     def beforeSave(self, instance):
         #save files
         def callback(file_obj):
-            if not isinstance(file_obj, basestring):
-                return self.filestore.save(file_obj)
+            file_obj.save()
             return file_obj
+        self._process_file_fields(instance, callback)
+
+        return instance
+
+    def afterDelete(self, instance):
+        #remove files
+        def callback(file_obj):
+            file_obj.delete()
         self._process_file_fields(instance, callback)
 
         return instance
