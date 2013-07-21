@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import micromodels
 
 
 class CollectionQuery(object):
@@ -13,28 +14,30 @@ class CollectionQuery(object):
         return self.collection.model
 
     @property
-    def datastore(self):
-        return self.collection.datastore
+    def data_store(self):
+        return self.collection.data_store
 
     @property
-    def filestore(self):
-        return self.collection.filestore
+    def file_store(self):
+        return self.collection.file_store
 
     def get(self, **params):
         if params:
             return self.clone(**params).get()
         if 'get' in self._cache:
-            result = self.datastore.get(self.params)
+            result = self.data_store.get(self.params)
             self._cache['get'] = \
-                self.datastore.load_instance(self.collection, result)
+                self.data_store.load_instance(self.collection, result)
         return self._cache['get']
 
     def __iter__(self):
         self._cache.setdefault('objects', dict())
+        if 'results' not in self._cache:
+            self.find()
         for index, result in enumerate(self._cache['results']):
             if index not in self._cache['objects']:
                 self._cache['objects'][index] = \
-                    self.datastore.load_instance(self.collection, result)
+                    self.data_store.load_instance(self.collection, result)
             yield self._cache['objects'][index]
 
     def find(self, **params):
@@ -44,23 +47,23 @@ class CollectionQuery(object):
             return self.all()
         if 'results' not in self._cache:
             self._cache['results'] = \
-                self.datastore.find(self.collection, self.params)
+                self.data_store.find(self.collection, self.params)
         return iter(self)
 
     def all(self):
         if self.params:
             return self.find()
         if 'results' not in self._cache:
-            self._cache['results'] = self.datastore.all(self.collection)
+            self._cache['results'] = self.data_store.all(self.collection)
         return iter(self)
 
     def delete(self):
-        return self.datastore.delete(self.collection, self.params)
+        return self.data_store.delete(self.collection, self.params)
 
     def count(self):
         if 'count' in self._cache:
             self._cache['count'] = \
-                self.datastore.count(self.collection, self.params)
+                self.data_store.count(self.collection, self.params)
         return self._cache['count']
 
     def exists(self, **params):
@@ -68,7 +71,7 @@ class CollectionQuery(object):
             return self.clone(**params).exists()
         if 'exists' in self._cache:
             self._cache['exists'] = \
-                self.datastore.exists(self.collection, self.params)
+                self.data_store.exists(self.collection, self.params)
         return self._cache['exists']
 
     def clone(self, **params):
@@ -103,11 +106,11 @@ class CRUDHooks(object):
 class Collection(CRUDHooks):
     object_id_field = 'id'
 
-    def __init__(self, model, datastore, filestore, name=None,
+    def __init__(self, model, data_store, file_store, name=None,
                  object_id_field=None):
         self.model = model
-        self.datastore = datastore
-        self.filestore = filestore
+        self.data_store = data_store
+        self.file_store = file_store
         self.name = name or model.__name__
         if object_id_field:
             self.object_id_field = object_id_field
@@ -163,21 +166,20 @@ class Collection(CRUDHooks):
         return self.get_query().count()
 
     def _process_file_fields(self, instance, callback):
-        from micromodels import FileField, ModelField, ModelCollectionField, FieldCollectionField
         for key, field in instance._fields.items():
-            if isinstance(field, FileField):
+            if isinstance(field, micromodels.FileField):
                 field.set_serializer(self.filestore.to_serial)
                 val = getattr(instance, key)
                 setattr(instance, key, callback(val))
-            elif isinstance(field, ModelField):
+            elif isinstance(field, micromodels.ModelField):
                 val = getattr(instance, key)
                 if val:
                     self._process_file_fields(val, callback)
-            elif isinstance(field, ModelCollectionField):
+            elif isinstance(field, micromodels.ModelCollectionField):
                 for val in getattr(instance, key):
                     self._process_file_fields(val, callback)
-            elif (isinstance(field, FieldCollectionField) and
-                  isinstance(field._instance, FileField)):
+            elif (isinstance(field, micromodels.FieldCollectionField) and
+                  isinstance(field._instance, micromodels.FileField)):
                 field._instance.set_serializer(self.filestore.to_serial)
                 val = getattr(instance, key)
                 new_val = list()
@@ -186,12 +188,12 @@ class Collection(CRUDHooks):
                 setattr(instance, key, new_val)
 
     def afterInitialize(self, instance):
-        instance.delete = lambda: self.datastore.remove(self, instance)
-        instance.save = lambda: self.datastore.save(self, instance)
+        instance.delete = lambda: self.data_store.remove(self, instance)
+        instance.save = lambda: self.data_store.save(self, instance)
 
         #load files
         def callback(file_path):
-            return self.filestore.load(file_path)
+            return self.file_store.load(file_path)
         self._process_file_fields(instance, callback)
 
         return instance
@@ -231,7 +233,7 @@ class PolymorphicCollection(Collection):
     object_type_field = '_object_type'
     object_types_field = '_object_types'
 
-    def __init__(self, model, **kwargs):
+    def __init__(self, model, *args, **kwargs):
         self.base_model = model
         #TODO monkey patch __new__ to record to model types
         # object_type => model
@@ -240,7 +242,7 @@ class PolymorphicCollection(Collection):
         # model => (object_type, object_types)
         self.reverse_descendent_registry = dict()
         model = PolymorphicLoader(self)
-        super(PolymorphicCollection, self).__init__(model, **kwargs)
+        super(PolymorphicCollection, self).__init__(model, *args, **kwargs)
 
     def get_model(self, object_type):
         if object_type not in self.descendent_registry:
@@ -261,7 +263,7 @@ class PolymorphicCollection(Collection):
             for entry in bases:
                 if isinstance(entry, tuple):
                     collect_parents(entry)
-                elif issubclass(entry, self.base_model):
+                elif issubclass(entry, micromodels.Model):
                     parent_type = self.extract_object_type(entry)
                     object_types.append(parent_type)
 
@@ -294,8 +296,15 @@ class PolymorphicCollection(Collection):
         instance = super(PolymorphicCollection, self).afterInitialize(instance)
         object_type = self.get_object_type(instance)
         if object_type:
-            setattr(instance, self.object_type_field, object_type)
+            instance.add_field(self.object_type_field, object_type,
+                micromodels.CharField())
         object_types = self.get_object_types(instance)
         if object_types is not None:
-            setattr(instance, self.object_types_field, object_types)
+            instance.add_field(self.object_types_field, object_types,
+                micromodels.FieldCollectionField(micromodels.CharField()))
         return instance
+
+    def findType(self, cls, **params):
+        object_type = self.extract_object_type(cls)
+        params[self.object_types_field] = object_type
+        return self.find(**params)

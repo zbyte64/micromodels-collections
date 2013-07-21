@@ -7,11 +7,12 @@ class UnsupportedOperation(Exception):
 
 class BaseDataStore(object):
     def execute_hooks(self, hook, kwargs):
-        return getattr(self.collection, hook)(**kwargs)
+        return getattr(kwargs.pop('collection'), hook)(**kwargs)
 
     def load_instance(self, collection, result):
         instance = collection.model(**result)
-        return self.execute_hooks('afterInitialize', {'instance': instance})
+        return self.execute_hooks('afterInitialize',
+            {'instance': instance, 'collection': collection})
 
     def save(self, collection, instance):
         raise UnsupportedOperation
@@ -40,8 +41,8 @@ class BaseDataStore(object):
 
 class MemoryDataStore(BaseDataStore):
 
-    def __init__(self):
-        super(MemoryDataStore, self).__init__()
+    def __init__(self, collection):
+        super(MemoryDataStore, self).__init__(collection)
         self.objects = dict()
 
     def get_object_lookup(self, collection, instance):
@@ -52,16 +53,20 @@ class MemoryDataStore(BaseDataStore):
         return hash('%s-%s' % (collection.name, pk))
 
     def save(self, collection, instance):
-        instance = self.execute_hooks('beforeSave', {'instance': instance})
+        instance = self.execute_hooks('beforeSave',
+            {'instance': instance, 'collection': collection})
         pk = self.get_object_lookup(collection, instance)
         self.objects[pk] = instance.to_dict(serial=True)
-        return self.execute_hooks('afterSave', {'instance': instance})
+        return self.execute_hooks('afterSave',
+            {'instance': instance, 'collection': collection})
 
     def remove(self, collection, instance):
-        instance = self.execute_hooks('beforeDelete', {'instance': instance})
+        instance = self.execute_hooks('beforeDelete',
+            {'instance': instance, 'collection': collection})
         pk = self.get_object_lookup(collection, instance)
         self.objects.pop(pk, None)
-        return self.execute_hooks('afterDelete', {'instance': instance})
+        return self.execute_hooks('afterDelete',
+            {'instance': instance, 'collection': collection})
 
     def get(self, collection, params):
         if 'pk' in params:
