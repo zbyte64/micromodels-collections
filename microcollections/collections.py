@@ -168,7 +168,7 @@ class Collection(CRUDHooks):
     def _process_file_fields(self, instance, callback):
         for key, field in instance._fields.items():
             if isinstance(field, micromodels.FileField):
-                field.set_serializer(self.filestore.to_serial)
+                field.set_serializer(self.file_store.to_serial)
                 val = getattr(instance, key)
                 setattr(instance, key, callback(val))
             elif isinstance(field, micromodels.ModelField):
@@ -180,7 +180,7 @@ class Collection(CRUDHooks):
                     self._process_file_fields(val, callback)
             elif (isinstance(field, micromodels.FieldCollectionField) and
                   isinstance(field._instance, micromodels.FileField)):
-                field._instance.set_serializer(self.filestore.to_serial)
+                field._instance.set_serializer(self.file_store.to_serial)
                 val = getattr(instance, key)
                 new_val = list()
                 for subval in val:
