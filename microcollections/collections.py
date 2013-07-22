@@ -24,8 +24,8 @@ class CollectionQuery(object):
     def get(self, **params):
         if params:
             return self.clone(**params).get()
-        if 'get' in self._cache:
-            result = self.data_store.get(self.params)
+        if 'get' not in self._cache:
+            result = self.data_store.get(self.collection, self.params)
             self._cache['get'] = \
                 self.data_store.load_instance(self.collection, result)
         return self._cache['get']
@@ -61,7 +61,7 @@ class CollectionQuery(object):
         return self.data_store.delete(self.collection, self.params)
 
     def count(self):
-        if 'count' in self._cache:
+        if 'count' not in self._cache:
             self._cache['count'] = \
                 self.data_store.count(self.collection, self.params)
         return self._cache['count']
@@ -69,7 +69,7 @@ class CollectionQuery(object):
     def exists(self, **params):
         if params:
             return self.clone(**params).exists()
-        if 'exists' in self._cache:
+        if 'exists' not in self._cache:
             self._cache['exists'] = \
                 self.data_store.exists(self.collection, self.params)
         return self._cache['exists']
