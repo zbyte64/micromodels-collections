@@ -201,7 +201,8 @@ class Collection(CRUDHooks):
     def beforeSave(self, instance):
         #save files
         def callback(file_obj):
-            file_obj.save()
+            if not isinstance(file_obj, basestring):
+                file_obj.save()
             return file_obj
         self._process_file_fields(instance, callback)
 
