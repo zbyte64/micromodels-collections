@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+from types import GeneratorType
+
 import micromodels
 
 
@@ -34,11 +36,39 @@ class CollectionQuery(object):
         self._cache.setdefault('objects', dict())
         if 'results' not in self._cache:
             self.find()
-        for index, result in enumerate(self._cache['results']):
-            if index not in self._cache['objects']:
+
+        #yield cached objects
+        index = 0
+        while index in self._cache['objects']:
+            yield self._cache['objects'][index]
+            index += 1
+
+        #yield objects not yet loaded
+        for index, result in self._cache['results']:
+            if index not in self._cache['objects']:  # redundant
                 self._cache['objects'][index] = \
                     self.data_store.load_instance(self.collection, result)
             yield self._cache['objects'][index]
+
+    def __getitem__(self, index):
+        #TODO communicate to backend so that we don't fetch more then we need
+        self._cache.setdefault('objects', dict())
+        if 'results' not in self._cache:
+            self.find()
+        if isinstance(index, slice):
+            def sliced_gen():
+                for y, obj in enumerate(iter(self)):
+                    if y >= index.start and y < index.stop:
+                        yield obj
+            return sliced_gen()
+        else:
+            if index in self._cache['objects']:
+                return self._cache['objects'][index]
+            else:
+                for y, obj in enumerate(iter(self)):
+                    if y == index:
+                        return obj
+        #TODO raise DoesNotExist
 
     def find(self, **params):
         if params:
@@ -46,8 +76,8 @@ class CollectionQuery(object):
         if not self.params:
             return self.all()
         if 'results' not in self._cache:
-            self._cache['results'] = \
-                self.data_store.find(self.collection, self.params)
+            results = self.data_store.find(self.collection, self.params)
+            self._cache['results'] = enumerate(results)
         return iter(self)
 
     def all(self):

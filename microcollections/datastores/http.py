@@ -14,6 +14,7 @@ class HTTPDataStore(BaseDataStore):
         if session is None:
             session = requests.Session()
         self.session = session
+        super(HTTPDataStore, self).__init__()
 
     def get_object_lookup(self, collection, instance):
         return collection.get_object_id(instance)
