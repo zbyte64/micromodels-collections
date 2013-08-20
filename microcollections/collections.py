@@ -137,11 +137,12 @@ class Collection(CRUDHooks):
     object_id_field = 'id'
 
     def __init__(self, model, data_store, file_store, name=None,
-                 object_id_field=None):
+                 object_id_field=None, params=None):
         self.model = model
         self.data_store = data_store
         self.file_store = file_store
         self.name = name or model.__name__
+        self.params = params
         if object_id_field:
             self.object_id_field = object_id_field
 
@@ -152,6 +153,8 @@ class Collection(CRUDHooks):
         return object_id
 
     def get_query(self, **params):
+        if self.params:
+            params.update(self.params)
         return CollectionQuery(self, params)
 
     def get(self, **params):
@@ -184,7 +187,13 @@ class Collection(CRUDHooks):
         Saves a new instance
         '''
         instance = self.new(**params)
-        return self.datastore.save(instance)
+        return self.save(instance)
+    
+    def save(self, instance):
+        return self.data_store.save(self, instance)
+    
+    def remove(self, instance):
+        return self.data_store.remove(self, instance)
 
     def all(self):
         return self.get_query()
@@ -218,8 +227,11 @@ class Collection(CRUDHooks):
                 setattr(instance, key, new_val)
 
     def afterInitialize(self, instance):
-        instance.delete = lambda: self.data_store.remove(self, instance)
-        instance.save = lambda: self.data_store.save(self, instance)
+        instance._collection = self
+        if not hasattr(instance, 'delete'):
+            instance.delete = lambda: self.remove(instance)
+        if not hasattr(instance, 'save'):
+            instance.save = lambda: self.save(instance)
 
         #load files
         def callback(file_path):
@@ -307,6 +319,8 @@ class PolymorphicCollection(Collection):
         if model in self.reverse_descendent_registry:
             return self.reverse_descendent_registry[model][0]
         object_type = getattr(instance, self.object_type_field, None)
+        if object_type is None:
+            object_type = self.extract_object_type(type(instance))
         if callable(object_type):
             object_type = object_type()
         return object_type
@@ -329,10 +343,14 @@ class PolymorphicCollection(Collection):
         if object_type:
             instance.add_field(self.object_type_field, object_type,
                 micromodels.CharField())
+        else:
+            assert False, 'Why is object type None?'
         object_types = self.get_object_types(instance)
         if object_types is not None:
             instance.add_field(self.object_types_field, object_types,
                 micromodels.FieldCollectionField(micromodels.CharField()))
+        else:
+            assert False, 'Why is object types None?'
         return instance
 
     def findType(self, cls, **params):
