@@ -79,6 +79,19 @@ class CollectionQuery(object):
             results = self.data_store.find(self.collection, self.params)
             self._cache['results'] = enumerate(results)
         return iter(self)
+    
+    def first(self, **params):
+        if params:
+            return self.clone(**params).first()
+        if not self.params:
+            return self.all().next()
+        if 'results' not in self._cache:
+            results = self.data_store.find(self.collection, self.params)
+            self._cache['results'] = enumerate(results)
+        try:
+            return iter(self).next()
+        except StopIteration:
+            return None
 
     def all(self):
         if self.params:
@@ -160,8 +173,16 @@ class Collection(CRUDHooks):
     def get(self, **params):
         '''
         Returns a single object matching the query params
+        Raises exception if no object matches
         '''
         return self.get_query(**params).get()
+    
+    def first(self, **params):
+        '''
+        Returns a single object matching the query params
+        Returns None if no object matches
+        '''
+        return self.get_query(**params).first()
 
     def find(self, **params):
         '''
