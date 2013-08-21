@@ -10,7 +10,7 @@ class BaseDataStore(object):
         return getattr(kwargs.pop('collection'), hook)(**kwargs)
 
     def load_instance(self, collection, result):
-        instance = collection.model(**result)
+        instance = collection.get_loader()(**result)
         return self.execute_hooks('afterInitialize',
             {'instance': instance, 'collection': collection})
 

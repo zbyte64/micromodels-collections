@@ -1,6 +1,4 @@
 # -*- coding: utf-8 -*-
-from types import GeneratorType
-
 import micromodels
 
 
@@ -79,7 +77,7 @@ class CollectionQuery(object):
             results = self.data_store.find(self.collection, self.params)
             self._cache['results'] = enumerate(results)
         return iter(self)
-    
+
     def first(self, **params):
         if params:
             return self.clone(**params).first()
@@ -124,6 +122,9 @@ class CollectionQuery(object):
 
 
 class CRUDHooks(object):
+    def modelRegistered(self, model):
+        return model
+
     def afterInitialize(self, instance):
         return instance
 
@@ -139,10 +140,10 @@ class CRUDHooks(object):
     def afterSave(self, instance):
         return instance
 
-    def beforeDelete(self, instance):
+    def beforeRemove(self, instance):
         return instance
 
-    def afterDelete(self, instance):
+    def afterRemove(self, instance):
         return instance
 
 
@@ -158,6 +159,25 @@ class Collection(CRUDHooks):
         self.params = params
         if object_id_field:
             self.object_id_field = object_id_field
+
+    def prepare_model(self, model):
+        '''
+        Clones the model so that we can set our collection hooks without
+        stepping on other collections with the same model
+        '''
+        attrs = dict(model.__dict__)
+        #I think this will break super(type(self), self)
+        bases = (model,) + model.__bases__
+        c_model = type(model.__name__, bases, attrs)
+        return self.modelRegistered(c_model)
+
+    def get_loader(self):
+        '''
+        Returns a callable that returns an instantiated model instance
+        '''
+        if not hasattr(self, '_prepped_model'):
+            self._prepped_model = self.prepare_model(self.model)
+        return self._prepped_model
 
     def get_object_id(self, instance):
         object_id = getattr(instance, self.object_id_field, None)
@@ -176,7 +196,7 @@ class Collection(CRUDHooks):
         Raises exception if no object matches
         '''
         return self.get_query(**params).get()
-    
+
     def first(self, **params):
         '''
         Returns a single object matching the query params
@@ -209,10 +229,10 @@ class Collection(CRUDHooks):
         '''
         instance = self.new(**params)
         return self.save(instance)
-    
+
     def save(self, instance):
         return self.data_store.save(self, instance)
-    
+
     def remove(self, instance):
         return self.data_store.remove(self, instance)
 
@@ -225,62 +245,46 @@ class Collection(CRUDHooks):
     def count(self):
         return self.get_query().count()
 
-    def _process_file_fields(self, instance, callback):
-        for key, field in instance._fields.items():
+    def inject_file_store(self, field):
+        field.set_hook('to_python', self.file_store.to_python)
+        field.set_hook('to_serial', self.file_store.to_serial)
+
+    def _process_file_fields(self, fields):
+        for key, field in fields.items():
             if isinstance(field, micromodels.FileField):
-                field.set_serializer(self.file_store.to_serial)
-                val = getattr(instance, key)
-                setattr(instance, key, callback(val))
+                self.inject_file_store(field)
             elif isinstance(field, micromodels.ModelField):
-                val = getattr(instance, key)
-                if val:
-                    self._process_file_fields(val, callback)
+                self._process_file_fields(field._wrapped_class._clsfields)
             elif isinstance(field, micromodels.ModelCollectionField):
-                for val in getattr(instance, key):
-                    self._process_file_fields(val, callback)
+                self._process_file_fields(field._wrapped_class._clsfields)
             elif (isinstance(field, micromodels.FieldCollectionField) and
                   isinstance(field._instance, micromodels.FileField)):
-                field._instance.set_serializer(self.file_store.to_serial)
-                val = getattr(instance, key)
-                new_val = list()
-                for subval in val:
-                    new_val.append(callback(subval))
-                setattr(instance, key, new_val)
+                self.inject_file_store(field._instance)
 
-    def afterInitialize(self, instance):
-        instance._collection = self
-        if not hasattr(instance, 'delete'):
-            instance.delete = lambda: self.remove(instance)
-        if not hasattr(instance, 'save'):
-            instance.save = lambda: self.save(instance)
+    def modelRegistered(self, model):
+        model._collection = self
 
-        #load files
-        def callback(file_path):
-            return self.file_store.load(file_path)
-        self._process_file_fields(instance, callback)
+        #model.set_hook('add_field', self.modelAddField)
 
-        return instance
+        if not hasattr(model, 'remove'):
+            def remove(instance):
+                return self.remove(instance)
+            model.remove = remove
 
-    def beforeSave(self, instance):
-        #save files
-        def callback(file_obj):
-            if not isinstance(file_obj, basestring):
-                file_obj.save()
-            return file_obj
-        self._process_file_fields(instance, callback)
+        if not hasattr(model, 'save'):
+            def save(instance):
+                return self.save(instance)
+            model.save = save
 
-        return instance
+        self._process_file_fields(model._clsfields)
 
-    def afterDelete(self, instance):
-        #remove files
-        def callback(file_obj):
-            file_obj.delete()
-        self._process_file_fields(instance, callback)
-
-        return instance
+        return model
 
 
 class PolymorphicLoader(object):
+    '''
+    Returns the proper model class based on the object type field
+    '''
     def __init__(self, poly_collection):
         self.collection = poly_collection
 
@@ -298,28 +302,38 @@ class PolymorphicCollection(Collection):
     object_types_field = '_object_types'
 
     def __init__(self, model, *args, **kwargs):
-        self.base_model = model
-        #TODO monkey patch __new__ to record to model types
+        self.prepped_base_model = self.prepare_model(model)
+
         # object_type => model
         self.descendent_registry = dict()
 
         # model => (object_type, object_types)
         self.reverse_descendent_registry = dict()
-        model = PolymorphicLoader(self)
         super(PolymorphicCollection, self).__init__(model, *args, **kwargs)
+
+    def get_loader(self):
+        return PolymorphicLoader(self)
 
     def get_model(self, object_type):
         if object_type not in self.descendent_registry:
-            #TODO attempt import
-            pass
-        return self.descendent_registry.get(object_type, self.base_model)
+            self.load_model(object_type)
+        return self.descendent_registry.get(object_type,
+                                            self.prepped_base_model)
+
+    def load_model(self, object_type):
+        #import and add model here
+        pass
 
     def extract_object_type(self, cls):
         return '%s.%s' (cls.__module__, cls.__name__)
 
-    def add_new_model(self, model):
-        if not issubclass(model, self.base_model):
+    def register_model(self, model):
+        '''
+        Registers a new model to belong in the collection
+        '''
+        if not issubclass(model, (self.model, self.prepped_base_model)):
             return
+        model = self.prepare_model(model)
         object_type = self.extract_object_type(model)
         object_types = [object_type]
 
@@ -329,13 +343,17 @@ class PolymorphicCollection(Collection):
                     collect_parents(entry)
                 elif issubclass(entry, micromodels.Model):
                     parent_type = self.extract_object_type(entry)
-                    object_types.append(parent_type)
+                    if parent_type not in object_types:
+                        object_types.append(parent_type)
 
         collect_parents(model.__bases__)
         self.descendent_registry[object_type] = model
         self.reverse_descendent_registry[model] = (object_type, object_types)
 
     def get_object_type(self, instance):
+        '''
+        Return a string representing the model instance type
+        '''
         model = type(instance)
         if model in self.reverse_descendent_registry:
             return self.reverse_descendent_registry[model][0]
@@ -347,6 +365,10 @@ class PolymorphicCollection(Collection):
         return object_type
 
     def get_object_types(self, instance):
+        '''
+        Return a list of strings representing the various inherritted types of
+        the model instance
+        '''
         model = type(instance)
         if model in self.reverse_descendent_registry:
             return self.reverse_descendent_registry[model][1]

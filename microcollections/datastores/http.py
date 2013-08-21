@@ -50,11 +50,11 @@ class HTTPDataStore(BaseDataStore):
             {'instance': instance, 'collection': collection})
 
     def remove(self, collection, instance):
-        instance = self.execute_hooks('beforeDelete',
+        instance = self.execute_hooks('beforeRemove',
             {'instance': instance, 'collection': collection})
         pk = self.get_object_lookup(collection, instance)
         self.session.delete(self.get_object_lookup(pk))
-        return self.execute_hooks('afterDelete',
+        return self.execute_hooks('afterRemove',
             {'instance': instance, 'collection': collection})
 
     def get(self, collection, params):

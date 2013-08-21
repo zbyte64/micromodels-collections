@@ -65,7 +65,7 @@ class FileProxy(io.BaseIO):
 
 
 class BaseFileStore(object):
-    def load(self, path):
+    def to_python(self, path):
         return FileProxy(filestore=self, path=path, committed=True, overwrite=True)
 
     def get_available_file_path(self, path):
