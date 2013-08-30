@@ -156,7 +156,7 @@ class Collection(CRUDHooks):
         self.data_store = data_store
         self.file_store = file_store
         self.name = name or model.__name__
-        self.params = params
+        self.params = params or dict()
         if object_id_field:
             self.object_id_field = object_id_field
 
@@ -166,6 +166,7 @@ class Collection(CRUDHooks):
         stepping on other collections with the same model
         '''
         attrs = dict(model.__dict__)
+        attrs['__collection'] = self
         #I think this will break super(type(self), self)
         bases = (model,) + model.__bases__
         c_model = type(model.__name__, bases, attrs)
@@ -389,7 +390,8 @@ class PolymorphicCollection(Collection):
         else:
             assert False, 'Why is object type None?'
         object_types = self.get_object_types(instance)
-        if object_types is not None:
+        if object_types:
+            assert len(set(object_types)) == len(object_types), 'Duplicate object types detected'
             instance.add_field(self.object_types_field, object_types,
                 micromodels.FieldCollectionField(micromodels.CharField()))
         else:
