@@ -41,7 +41,7 @@ class HTTPDataStore(BaseDataStore):
         instance = self.execute_hooks('beforeSave',
             {'instance': instance, 'collection': collection})
         pk = self.get_object_lookup(collection, instance)
-        payload = self.serialize_data(instance.to_dict(serial=True))
+        payload = self.serialize_data(collection.get_serializable(instance))
         if pk:
             self.session.put(self.get_object_url(pk), data=payload)
         else:

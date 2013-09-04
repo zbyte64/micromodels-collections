@@ -107,6 +107,12 @@ class CollectionQuery(object):
                 self.data_store.count(self.collection, self.params)
         return self._cache['count']
 
+    def keys(self):
+        if 'keys' not in self._cache:
+            self._cache['keys'] = \
+                self.data_store.keys(self.collection, self.params)
+        return self._cache['keys']
+
     def exists(self, **params):
         if params:
             return self.clone(**params).exists()
@@ -147,49 +153,60 @@ class CRUDHooks(object):
         return instance
 
 
-class Collection(CRUDHooks):
+class RawCollection(CRUDHooks):
+    '''
+    A collection that returns dictionaries
+    '''
     object_id_field = 'id'
 
-    def __init__(self, model, data_store, file_store, name=None,
+    def __init__(self, data_store, file_store, model=dict, name=None,
                  object_id_field=None, params=None):
         self.model = model
         self.data_store = data_store
         self.file_store = file_store
-        self.name = name or model.__name__
+        self.name = name
         self.params = params or dict()
         if object_id_field:
             self.object_id_field = object_id_field
 
-    def prepare_model(self, model):
-        '''
-        Clones the model so that we can set our collection hooks without
-        stepping on other collections with the same model
-        '''
-        attrs = dict(model.__dict__)
-        attrs['__collection'] = self
-        #I think this will break super(type(self), self)
-        bases = (model,) + model.__bases__
-        c_model = type(model.__name__, bases, attrs)
-        return self.modelRegistered(c_model)
-
     def get_loader(self):
-        '''
-        Returns a callable that returns an instantiated model instance
-        '''
-        if not hasattr(self, '_prepped_model'):
-            self._prepped_model = self.prepare_model(self.model)
-        return self._prepped_model
+        return self.model
 
     def get_object_id(self, instance):
-        object_id = getattr(instance, self.object_id_field, None)
+        object_id = instance.get(self.object_id_field)
         if callable(object_id):
             object_id = object_id()
         return object_id
+
+    def get_serializable(self, instance):
+        '''
+        Returns an object representation that can be easily serialized
+        '''
+        return instance
 
     def get_query(self, **params):
         if self.params:
             params.update(self.params)
         return CollectionQuery(self, params)
+
+    def __setitem__(self, key, instance):
+        instance.set(self.object_id_field, key)
+        return self.save(instance)
+
+    def __getitem__(self, key):
+        return self.get(pk=key)
+
+    def __delitem__(self, key):
+        return self.find(pk=key).delete()
+
+    def __contains__(self, key):
+        return self.exists(pk=key)
+
+    def __len__(self):
+        return self.count()
+
+    def keys(self):
+        return self.get_query().keys()
 
     def get(self, **params):
         '''
@@ -245,6 +262,48 @@ class Collection(CRUDHooks):
 
     def count(self):
         return self.get_query().count()
+
+
+class Collection(RawCollection):
+    '''
+    A collection bound to a schema and returns model instances
+    '''
+    def __init__(self, model, data_store, file_store, name=None,
+                 object_id_field=None, params=None):
+        if name is None:
+            name = model.__name__
+        super(Collection, self).__init__(model=model, data_store=data_store,
+            file_store=file_store, name=name, object_id_field=object_id_field,
+            params=params,)
+
+    def prepare_model(self, model):
+        '''
+        Clones the model so that we can set our collection hooks without
+        stepping on other collections with the same model
+        '''
+        attrs = dict(model.__dict__)
+        attrs['__collection'] = self
+        #I think this will break super(type(self), self)
+        bases = (model,) + model.__bases__
+        c_model = type(model.__name__, bases, attrs)
+        return self.modelRegistered(c_model)
+
+    def get_loader(self):
+        '''
+        Returns a callable that returns an instantiated model instance
+        '''
+        if not hasattr(self, '_prepped_model'):
+            self._prepped_model = self.prepare_model(self.model)
+        return self._prepped_model
+
+    def get_object_id(self, instance):
+        object_id = getattr(instance, self.object_id_field, None)
+        if callable(object_id):
+            object_id = object_id()
+        return object_id
+
+    def get_serializable(self, instance):
+        return instance.to_dict(serial=True)
 
     def inject_file_store(self, field):
         field.set_hook('to_python', self.file_store.to_python)

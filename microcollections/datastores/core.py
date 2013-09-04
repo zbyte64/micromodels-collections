@@ -37,3 +37,7 @@ class BaseDataStore(object):
 
     def count(self, collection, params):
         return len(self.find(collection, params))
+
+    def keys(self, collection, params):
+        for instance in self.find(collection, params):
+            yield collection.get_object_id(instance)

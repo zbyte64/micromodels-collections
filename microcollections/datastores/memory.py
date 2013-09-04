@@ -18,7 +18,7 @@ class MemoryDataStore(BaseDataStore):
         instance = self.execute_hooks('beforeSave',
             {'instance': instance, 'collection': collection})
         pk = self.get_object_lookup(collection, instance)
-        self.objects[pk] = instance.to_dict(serial=True)
+        self.objects[pk] = collection.get_serializable(instance)
         return self.execute_hooks('afterSave',
             {'instance': instance, 'collection': collection})
 
