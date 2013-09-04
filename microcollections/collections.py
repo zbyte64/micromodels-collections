@@ -190,7 +190,10 @@ class RawCollection(CRUDHooks):
         return CollectionQuery(self, params)
 
     def __setitem__(self, key, instance):
-        instance.set(self.object_id_field, key)
+        if hasattr(instance, '__setitem__'):
+            instance[self.object_id_field] = key
+        else:
+            setattr(instance, self.object_id_field, key)
         return self.save(instance)
 
     def __getitem__(self, key):
