@@ -3,7 +3,7 @@ import os
 import io
 
 
-class FileProxy(io.BaseIO):
+class FileProxy(io.IOBase):
     def __init__(self, filestore, path=None, committed=False, overwrite=False):
         self.filestore = filestore
         self.path = path
