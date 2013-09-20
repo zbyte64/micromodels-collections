@@ -2,6 +2,10 @@
 import micromodels
 
 
+class NotSet:
+    pass
+
+
 class CollectionQuery(object):
 
     def __init__(self, collection, params):
@@ -155,7 +159,7 @@ class CRUDHooks(object):
 
 class RawCollection(CRUDHooks):
     '''
-    A collection that returns dictionaries
+    A collection that returns dictionaries and responds like a dictionary
     '''
     object_id_field = 'id'
 
@@ -189,6 +193,8 @@ class RawCollection(CRUDHooks):
             params.update(self.params)
         return CollectionQuery(self, params)
 
+    ## Dictionary like methods ##
+
     def __setitem__(self, key, instance):
         if hasattr(instance, '__setitem__'):
             instance[self.object_id_field] = key
@@ -211,12 +217,55 @@ class RawCollection(CRUDHooks):
     def keys(self):
         return self.get_query().keys()
 
-    def get(self, **params):
+    def values(self):
+        return self.all()
+
+    def items(self):
+        #TODO make efficient
+        for key in self.keys():
+            yield (key, self.get(key))
+
+    def update(self, items):
+        for key, value in items.items():
+            self[key] = value
+
+    def pop(self, key, default=NotSet):
+        try:
+            instance = self[key]
+        except (KeyError, IndexError):
+            if default == NotSet:
+                raise
+            return default
+        instance.remove()
+        return instance
+
+    def has_key(self, key):
+        return key in self
+
+    def clear(self):
+        self.delete()
+
+    def setdefault(self, key, value):
+        if key in self:
+            return
+        self[key] = value
+
+    def copy(self):
+        return dict(self.items())
+
+    def get(self, pk=None, _default=None, **params):
         '''
         Returns a single object matching the query params
         Raises exception if no object matches
         '''
-        return self.get_query(**params).get()
+        if pk is not None:
+            params['pk'] = pk
+        try:
+            return self.get_query(**params).get()
+        except (KeyError, IndexError):
+            return _default
+
+    ## Query Methods ##
 
     def first(self, **params):
         '''
