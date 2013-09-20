@@ -99,7 +99,8 @@ class CollectionQuery(object):
         if self.params:
             return self.find()
         if 'results' not in self._cache:
-            self._cache['results'] = self.data_store.all(self.collection)
+            results = self.data_store.all(self.collection)
+            self._cache['results'] = enumerate(results)
         return iter(self)
 
     def delete(self):
