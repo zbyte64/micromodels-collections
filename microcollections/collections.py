@@ -163,9 +163,10 @@ class RawCollection(CRUDHooks):
     A collection that returns dictionaries and responds like a dictionary
     '''
     object_id_field = 'id'
+    id_generator = None
 
     def __init__(self, data_store, file_store, model=dict, name=None,
-                 object_id_field=None, params=None):
+                 object_id_field=None, id_generator=None, params=None):
         self.model = model
         self.data_store = data_store
         self.file_store = file_store
@@ -173,12 +174,14 @@ class RawCollection(CRUDHooks):
         self.params = params or dict()
         if object_id_field:
             self.object_id_field = object_id_field
+        if id_generator:
+            self.id_generator = id_generator
 
     def get_loader(self):
         return self.model
 
     def get_object_id(self, instance):
-        object_id = instance.get(self.object_id_field)
+        object_id = instance.get(self.object_id_field, self.id_generator)
         if callable(object_id):
             object_id = object_id()
         return object_id
@@ -316,18 +319,29 @@ class RawCollection(CRUDHooks):
     def count(self):
         return self.get_query().count()
 
+    ## Hooks ##
+
+    def beforeSave(self, instance):
+        #set the id field
+        key = self.get_object_id(instance)
+        if hasattr(instance, '__setitem__'):
+            instance[self.object_id_field] = key
+        else:
+            setattr(instance, self.object_id_field, key)
+        return super(RawCollection, self).beforeSave(instance)
+
 
 class Collection(RawCollection):
     '''
     A collection bound to a schema and returns model instances
     '''
     def __init__(self, model, data_store, file_store, name=None,
-                 object_id_field=None, params=None):
+                 object_id_field=None, id_generator=None, params=None):
         if name is None:
             name = model.__name__
         super(Collection, self).__init__(model=model, data_store=data_store,
             file_store=file_store, name=name, object_id_field=object_id_field,
-            params=params,)
+            id_generator=id_generator, params=params,)
 
     def prepare_model(self, model):
         '''
@@ -350,7 +364,7 @@ class Collection(RawCollection):
         return self._prepped_model
 
     def get_object_id(self, instance):
-        object_id = getattr(instance, self.object_id_field, None)
+        object_id = getattr(instance, self.object_id_field, self.id_generator)
         if callable(object_id):
             object_id = object_id()
         return object_id
