@@ -60,6 +60,10 @@ class MemoryDataStore(BaseDataStore):
         return cstore.values()
 
     def delete(self, collection, params):
+        cstore = self._get_cstore(collection)
         objects = self.find(collection, params)
         for obj in objects:
-            obj.remove()
+            pk = obj.get(collection.object_id_field)
+            cstore.pop(pk)
+        return self.execute_hooks('afterDelete',
+            {'collection': collection})

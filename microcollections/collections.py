@@ -157,6 +157,10 @@ class CRUDHooks(object):
     def afterRemove(self, instance):
         return instance
 
+    #CONSIDER: ids or params?
+    def afterDelete(self):
+        return
+
 
 class RawCollection(CRUDHooks):
     '''
