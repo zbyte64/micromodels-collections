@@ -326,12 +326,13 @@ class RawCollection(CRUDHooks):
     ## Hooks ##
 
     def beforeSave(self, instance):
-        #set the id field
-        key = self.get_object_id(instance)
-        if hasattr(instance, '__setitem__'):
-            instance[self.object_id_field] = key
-        else:
-            setattr(instance, self.object_id_field, key)
+        #set the id field if we have one
+        if self.object_id_field:
+            key = self.get_object_id(instance)
+            if hasattr(instance, '__setitem__'):
+                instance[self.object_id_field] = key
+            else:
+                setattr(instance, self.object_id_field, key)
         return super(RawCollection, self).beforeSave(instance)
 
 
@@ -384,6 +385,8 @@ class Collection(RawCollection):
         for key, field in fields.items():
             if isinstance(field, micromodels.FileField):
                 self.inject_file_store(field)
+            #CONSIDER: we may want to clone submodels for proper serialization
+            #OR come up with a more functional approach
             elif isinstance(field, micromodels.ModelField):
                 self._process_file_fields(field._wrapped_class._clsfields)
             elif isinstance(field, micromodels.ModelCollectionField):
