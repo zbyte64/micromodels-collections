@@ -52,3 +52,17 @@ class TestFileDirectoryCollection(unittest.TestCase):
         self.collection['obj1'] = mocked_file
         self.assertTrue('obj1' in self.collection)
         self.assertEqual(self.collection['obj1'].read(), 'my text file')
+
+    def test_update(self):
+        self.collection['obj1'] = io.BytesIO('my text file')
+        new_obj = self.collection['obj1']
+        #TODO better syntax, delay open mode
+        updated_obj = io.BytesIO(new_obj.read() + '\nmore text')
+        self.collection['obj1'] = updated_obj
+        self.assertTrue('obj1' in self.collection)
+        self.assertTrue('more text' in self.collection['obj1'].read())
+
+    def test_delete(self):
+        self.collection['obj1'] = io.BytesIO('my text file')
+        del self.collection['obj1']
+        self.assertFalse('obj1' in self.collection)

@@ -17,6 +17,7 @@ class FileCollection(BaseCollection):
     #CONSIDER: it is up to the collection to provide uri <=> path transalations
 
 
+#TODO what about overwriting files?
 class BaseFileStore(BaseDataStore):
     def get_available_file_path(self, path):
         return path
@@ -28,6 +29,9 @@ class BaseFileStore(BaseDataStore):
         raise NotImplementedError
 
     def delete_file(self, path):
+        raise NotImplementedError
+
+    def file_exists(self, path):
         raise NotImplementedError
 
     def save(self, collection, instance):
@@ -48,6 +52,8 @@ class BaseFileStore(BaseDataStore):
         path = self._normalize_params(collection, params).get('pk', None)
         if path is None:
             raise UnsupportedOperation('Lookups must be by path')
+        if not self.file_exists(path):
+            raise KeyError('Path not found: %s' % path)
         return {
             'lazy_file': (self.open_file, path),
             'path': path,
@@ -55,16 +61,22 @@ class BaseFileStore(BaseDataStore):
 
     def find(self, collection, params):
         params = self._normalize_params(collection, params)
+        objects = list()
         if 'pk' in params:
-            return [self.get(collection, params)]
-        if 'pk__in' in params:
-            objects = list()
-            for val in params['pk__in']:
+            val = params['pk']
+            if self.file_exists(val):
                 objects.append({
                     'lazy_file': (self.open_file, val),
                     'path': val,
                 })
-            return objects
+        if 'pk__in' in params:
+            for val in params['pk__in']:
+                if self.file_exists(val):
+                    objects.append({
+                        'lazy_file': (self.open_file, val),
+                        'path': val,
+                    })
+        return objects
         raise UnsupportedOperation('Lookups must be by path')
 
     def delete(self, collection, params):
