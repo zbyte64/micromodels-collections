@@ -72,6 +72,9 @@ class CollectionQuery(object):
                         return obj
         raise KeyError('Not found: %s' % index)
 
+    def __len__(self):
+        return self.count()
+
     def find(self, **params):
         if params:
             return self.clone(**params).find()

@@ -20,6 +20,24 @@ class TestMemoryCollection(unittest.TestCase):
         self.assertTrue('obj1' in self.collection)
         self.assertEqual(self.collection['obj1']['foo'], 'bar')
 
+    def test_update(self):
+        self.collection['obj1'] = {'foo': 'bar'}
+        new_obj = self.collection['obj1']
+        new_obj['bar'] = 'foo'
+        self.collection['obj1'] = new_obj
+        self.assertTrue('obj1' in self.collection)
+        self.assertEqual(self.collection['obj1']['bar'], 'foo')
+
+    def test_delete(self):
+        self.collection['obj1'] = {'foo': 'bar'}
+        del self.collection['obj1']
+        self.assertFalse('obj1' in self.collection)
+
+    def test_find(self):
+        self.collection['obj1'] = {'foo': 'bar'}
+        query = self.collection.find(foo='bar')
+        self.assertEqual(len(query), 1)
+
 
 class TestFileDirectoryCollection(unittest.TestCase):
     def setUp(self):
