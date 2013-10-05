@@ -44,3 +44,12 @@ class FileProxy(FileProxyMixin):
         if not self._file:
             self._file = self.lazy_file[0](*self.lazy_file[1:])
         return self._file
+
+
+class URIFileProxy(FileProxy):
+    def __init__(self, uri, path, file=None, lazy_file=None):
+        assert file or lazy_file
+        self._file = file
+        self.lazy_file = lazy_file
+        self.path = path
+        self.uri = uri

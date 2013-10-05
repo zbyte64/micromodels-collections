@@ -14,12 +14,11 @@ class FileCollection(BaseCollection):
     def __init__(self, data_store):
         self.data_store = data_store  # of type file store
 
-    #CONSIDER: it is up to the collection to provide uri <=> path transalations
-
 
 #TODO what about overwriting files?
 class BaseFileStore(BaseDataStore):
     def get_available_file_path(self, path):
+        #TODO
         return path
 
     def save_file(self, file_obj, path):

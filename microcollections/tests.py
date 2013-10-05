@@ -9,6 +9,7 @@ from microcollections.collections import RawCollection
 from microcollections.datastores.memory import MemoryDataStore
 from microcollections.filestores import FileCollection
 from microcollections.filestores.directory import DirectoryFileStore
+from microcollections.filestores.uri import URICollection
 
 
 class TestMemoryCollection(unittest.TestCase):
@@ -66,3 +67,35 @@ class TestFileDirectoryCollection(unittest.TestCase):
         self.collection['obj1'] = io.BytesIO('my text file')
         del self.collection['obj1']
         self.assertFalse('obj1' in self.collection)
+
+
+class TestURIDirectoryCollection(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.mkdtemp()
+        self.file_store = DirectoryFileStore(self.directory)
+        self.collection = {
+            r'file://tmp/(?P<path>.*)': self.file_store
+        }
+
+    def tearDown(self):
+        shutil.rmtree(self.directory)
+
+    def test_creation(self):
+        mocked_file = io.BytesIO('my text file')
+        self.collection['file://tmp/obj1'] = mocked_file
+        self.assertTrue('file://tmp/obj1' in self.collection)
+        self.assertEqual(self.collection['file://tmp/obj1'].read(), 'my text file')
+
+    def test_update(self):
+        self.collection['file://tmp/obj1'] = io.BytesIO('my text file')
+        new_obj = self.collection['file://tmp/obj1']
+        #TODO better syntax, delay open mode
+        updated_obj = io.BytesIO(new_obj.read() + '\nmore text')
+        self.collection['file://tmp/obj1'] = updated_obj
+        self.assertTrue('file://tmp/obj1' in self.collection)
+        self.assertTrue('more text' in self.collection['file://tmp/obj1'].read())
+
+    def test_delete(self):
+        self.collection['file://tmp/obj1'] = io.BytesIO('my text file')
+        del self.collection['file://tmp/obj1']
+        self.assertFalse('file://tmp/obj1' in self.collection)
