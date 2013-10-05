@@ -73,9 +73,9 @@ class TestURIDirectoryCollection(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.mkdtemp()
         self.file_store = DirectoryFileStore(self.directory)
-        self.collection = {
-            r'file://tmp/(?P<path>.*)': self.file_store
-        }
+        self.collection = URICollection({
+            r'^file://tmp/(?P<path>.*)$': self.file_store
+        })
 
     def tearDown(self):
         shutil.rmtree(self.directory)
@@ -99,3 +99,16 @@ class TestURIDirectoryCollection(unittest.TestCase):
         self.collection['file://tmp/obj1'] = io.BytesIO('my text file')
         del self.collection['file://tmp/obj1']
         self.assertFalse('file://tmp/obj1' in self.collection)
+
+    def test_no_protocol_match(self):
+        self.assertFalse('ftp://obj1' in self.collection)
+        self.assertFalse(self.collection.lookup_data_store('ftp://obj1'))
+
+    def test_no_protocol_match_write(self):
+        try:
+            self.collection['ftp://obj1'] = io.BytesIO('my text file')
+        except KeyError:
+            pass
+        else:
+            self.fail('Should not be able to save to an unregistered uri')
+        self.assertFalse('ftp://obj1' in self.collection)

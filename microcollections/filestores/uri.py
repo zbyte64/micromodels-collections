@@ -18,10 +18,14 @@ class URICollection(BaseCollection):
         self.data_store = ProxyFileStore(self)
 
     def lookup_data_store(self, uri):
-        for pattern, func in self.file_stores.items():
+        for pattern, fs in self.file_stores.items():
             found = re.compile(pattern).match(uri)
             if found:
-                return func, found.groupdict() or {'path':found.groups()[0]}
+                kwargs = found.groupdict() or {'path':found.groups()[0]}
+                kwargs['file_store'] = fs
+                return kwargs
+        return None
+        #TODO return NullFileStore
 
 
 class ProxyFileStore(BaseFileStore):
@@ -29,25 +33,36 @@ class ProxyFileStore(BaseFileStore):
         self.collection = collection
 
     def get_available_file_uri(self, uri):
-        file_store, kwargs = self.collection.lookup_data_store(uri)
-        path = file_store.get_available_file_path(kwargs['path'])
+        kwargs = self.collection.lookup_data_store(uri)
+        if not kwargs:
+            raise KeyError('Could not match a file store for the uri')
+        path = kwargs['file_store'].get_available_file_path(kwargs['path'])
         return path #TODO
 
     def save_file(self, file_obj, uri):
-        file_store, kwargs = self.collection.lookup_data_store(uri)
-        return file_store.save_file(file_obj, kwargs['path'])
+        kwargs = self.collection.lookup_data_store(uri)
+        if not kwargs:
+            raise KeyError('Could not match a file store for the uri')
+        return kwargs['file_store'].save_file(file_obj, kwargs['path'])
 
     def open_file(self, uri, mode='rb'):
-        file_store, kwargs = self.collection.lookup_data_store(uri)
-        return file_store.open_file(kwargs['path'], mode)
+        kwargs = self.collection.lookup_data_store(uri)
+        if not kwargs:
+            raise KeyError('Could not match a file store for the uri')
+        return kwargs['file_store'].open_file(kwargs['path'], mode)
 
     def delete_file(self, uri):
-        file_store, kwargs = self.collection.lookup_data_store(uri)
-        return file_store.delete_file(kwargs['path'])
+        kwargs = self.collection.lookup_data_store(uri)
+        if not kwargs:
+            raise KeyError('Could not match a file store for the uri')
+        return kwargs['file_store'].delete_file(kwargs['path'])
 
     def file_exists(self, uri):
-        file_store, kwargs = self.collection.lookup_data_store(uri)
-        return file_store.file_exists(kwargs['path'])
+        kwargs = self.collection.lookup_data_store(uri)
+        if not kwargs:
+            return False
+            raise KeyError('Could not match a file store for the uri')
+        return kwargs['file_store'].file_exists(kwargs['path'])
 
     def save(self, collection, instance):
         instance = self.execute_hooks('beforeSave',
@@ -62,3 +77,34 @@ class ProxyFileStore(BaseFileStore):
         self.delete_file(instance.uri)
         return self.execute_hooks('afterRemove',
             {'instance': instance, 'collection': collection})
+
+    def get(self, collection, params):
+        uri = self._normalize_params(collection, params).get('pk', None)
+        if uri is None:
+            raise UnsupportedOperation('Lookups must be by uri')
+        if not self.file_exists(uri):
+            raise KeyError('URI not found: %s' % uri)
+        return {
+            'lazy_file': (self.open_file, uri),
+            'uri': uri,
+        }
+
+    def find(self, collection, params):
+        params = self._normalize_params(collection, params)
+        objects = list()
+        if 'pk' in params:
+            val = params['pk']
+            if self.file_exists(val):
+                objects.append({
+                    'lazy_file': (self.open_file, val),
+                    'uri': val,
+                })
+        if 'pk__in' in params:
+            for val in params['pk__in']:
+                if self.file_exists(val):
+                    objects.append({
+                        'lazy_file': (self.open_file, val),
+                        'uri': val,
+                    })
+        return objects
+        raise UnsupportedOperation('Lookups must be by uri')
