@@ -70,7 +70,7 @@ class CollectionQuery(object):
                 for y, obj in enumerate(iter(self)):
                     if y == index:
                         return obj
-        #TODO raise DoesNotExist
+        raise KeyError('Not found: %s' % index)
 
     def find(self, **params):
         if params:
@@ -162,24 +162,16 @@ class CRUDHooks(object):
         return
 
 
-class RawCollection(CRUDHooks):
-    '''
-    A collection that returns dictionaries and responds like a dictionary
-    '''
-    object_id_field = 'id'
+class BaseCollection(CRUDHooks):
+    model = None
+    object_id_field = None
     id_generator = None
+    params = dict()
 
-    def __init__(self, data_store, file_store, model=dict, name=None,
-                 object_id_field=None, id_generator=None, params=None):
-        self.model = model
-        self.data_store = data_store
-        self.file_store = file_store
-        self.name = name
-        self.params = params or dict()
-        if object_id_field:
-            self.object_id_field = object_id_field
-        if id_generator:
-            self.id_generator = id_generator
+    def get_query(self, **params):
+        if self.params:
+            params.update(self.params)
+        return CollectionQuery(self, params)
 
     def get_loader(self):
         return self.model
@@ -196,18 +188,14 @@ class RawCollection(CRUDHooks):
         '''
         return instance
 
-    def get_query(self, **params):
-        if self.params:
-            params.update(self.params)
-        return CollectionQuery(self, params)
-
     ## Dictionary like methods ##
 
     def __setitem__(self, key, instance):
-        if hasattr(instance, '__setitem__'):
-            instance[self.object_id_field] = key
-        else:
-            setattr(instance, self.object_id_field, key)
+        if self.object_id_field:
+            if hasattr(instance, '__setitem__'):
+                instance[self.object_id_field] = key
+            else:
+                setattr(instance, self.object_id_field, key)
         return self.save(instance)
 
     def __getitem__(self, key):
@@ -323,6 +311,24 @@ class RawCollection(CRUDHooks):
     def count(self):
         return self.get_query().count()
 
+
+class RawCollection(BaseCollection):
+    '''
+    A collection that returns dictionaries and responds like a dictionary
+    '''
+    object_id_field = 'id'
+
+    def __init__(self, data_store, model=dict, name=None,
+                 object_id_field=None, id_generator=None, params=None):
+        self.model = model
+        self.data_store = data_store
+        self.name = name
+        self.params = params or dict()
+        if object_id_field:
+            self.object_id_field = object_id_field
+        if id_generator:
+            self.id_generator = id_generator
+
     ## Hooks ##
 
     def beforeSave(self, instance):
@@ -340,12 +346,12 @@ class Collection(RawCollection):
     '''
     A collection bound to a schema and returns model instances
     '''
-    def __init__(self, model, data_store, file_store, name=None,
+    def __init__(self, model, data_store, name=None,
                  object_id_field=None, id_generator=None, params=None):
         if name is None:
             name = model.__name__
         super(Collection, self).__init__(model=model, data_store=data_store,
-            file_store=file_store, name=name, object_id_field=object_id_field,
+            name=name, object_id_field=object_id_field,
             id_generator=id_generator, params=params,)
 
     def prepare_model(self, model):
@@ -377,28 +383,8 @@ class Collection(RawCollection):
     def get_serializable(self, instance):
         return instance.to_dict(serial=True)
 
-    def inject_file_store(self, field):
-        field.set_hook('to_python', self.file_store.to_python)
-        field.set_hook('to_serial', self.file_store.to_serial)
-
-    def _process_file_fields(self, fields):
-        for key, field in fields.items():
-            if isinstance(field, micromodels.FileField):
-                self.inject_file_store(field)
-            #CONSIDER: we may want to clone submodels for proper serialization
-            #OR come up with a more functional approach
-            elif isinstance(field, micromodels.ModelField):
-                self._process_file_fields(field._wrapped_class._clsfields)
-            elif isinstance(field, micromodels.ModelCollectionField):
-                self._process_file_fields(field._wrapped_class._clsfields)
-            elif (isinstance(field, micromodels.FieldCollectionField) and
-                  isinstance(field._instance, micromodels.FileField)):
-                self.inject_file_store(field._instance)
-
     def modelRegistered(self, model):
         model._collection = self
-
-        #model.set_hook('add_field', self.modelAddField)
 
         if not hasattr(model, 'remove'):
             def remove(instance):
@@ -409,8 +395,6 @@ class Collection(RawCollection):
             def save(instance):
                 return self.save(instance)
             model.save = save
-
-        self._process_file_fields(model._clsfields)
 
         return model
 

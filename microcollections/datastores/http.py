@@ -58,11 +58,13 @@ class HTTPDataStore(BaseDataStore):
             {'instance': instance, 'collection': collection})
 
     def get(self, collection, params):
+        params = self._normalize_params(collection, params)
         if 'pk' in params:
             response = self.session.get(self.get_object_url(params['pk']))
             return self.deserialize_response(response)
         raise UnsupportedOperation('Lookups must be by pk')
 
     def find(self, collection, params):
-        response = self.session.get(self.get_index_url())
+        #TODO invert params = self._normalize_params(collection, params)
+        response = self.session.get(self.get_index_url(), params=params)
         return self.deserialize_response(response)

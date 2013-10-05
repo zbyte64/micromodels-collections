@@ -20,6 +20,16 @@ class BaseDataStore(object):
     def remove(self, collection, instance):
         raise UnsupportedOperation
 
+    def _normalize_params(self, collection, params):
+        id_field = collection.object_id_field
+        if id_field:
+            params = dict(params)
+            if id_field in params:
+                params['pk'] = params.pop(id_field)
+            if '%s__in' % id_field in params:
+                params['pk__in'] = params.pop('%s__in' % id_field)
+        return params
+
     def get(self, collection, params):
         raise UnsupportedOperation
 

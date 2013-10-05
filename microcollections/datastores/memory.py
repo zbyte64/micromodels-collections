@@ -31,6 +31,7 @@ class MemoryDataStore(BaseDataStore):
             {'instance': instance, 'collection': collection})
 
     def get(self, collection, params):
+        params = self._normalize_params(collection, params)
         if 'pk' in params:
             cstore = self._get_cstore(collection)
             return cstore[params['pk']]
@@ -39,6 +40,7 @@ class MemoryDataStore(BaseDataStore):
     def find(self, collection, params):
         cstore = self._get_cstore(collection)
         if params:
+            params = self._normalize_params(collection, params)
             objects = list()
             for pk, obj in cstore.items():
                 match = True

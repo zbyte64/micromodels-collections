@@ -26,7 +26,7 @@ setup(
     packages=find_packages(),
     url='https://github.com/zbyte64/micromodels-collections/',
     license='Public Domain',
-    tests_require=["nose"],
+    tests_require=["nose", "werkzeug"],
     test_suite = 'nose.collector',
     classifiers = [
         'Programming Language :: Python',
