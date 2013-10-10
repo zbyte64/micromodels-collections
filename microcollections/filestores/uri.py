@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import re
 
+from microcollections.datastores.core import UnsupportedOperation
 from .core import BaseCollection, BaseFileStore
 from .utils import URIFileProxy
 

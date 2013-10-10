@@ -17,7 +17,7 @@ class FileCollection(BaseCollection):
 
 #TODO what about overwriting files?
 class BaseFileStore(BaseDataStore):
-    def get_available_file_path(self, path):
+    def get_available_key(self, path):
         #TODO
         return path
 
