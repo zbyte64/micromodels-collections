@@ -14,6 +14,9 @@ class FileCollection(BaseCollection):
     def __init__(self, data_store):
         self.data_store = data_store  # of type file store
 
+    def get_available_key(self, path):
+        return self.data_store.get_available_key(path)
+
 
 #TODO what about overwriting files?
 class BaseFileStore(BaseDataStore):

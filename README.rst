@@ -1,1 +1,1 @@
-microcollections provides datastore capabilities for micromodels
+microcollections provides datastore capabilities for micromodels-ng

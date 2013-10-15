@@ -28,16 +28,19 @@ class URICollection(BaseCollection):
         return None
         #TODO return NullFileStore
 
+    def get_available_key(self, path):
+        return self.data_store.get_available_key(path)
+
 
 class ProxyFileStore(BaseFileStore):
     def __init__(self, collection):
         self.collection = collection
 
-    def get_available_file_uri(self, uri):
+    def get_available_key(self, uri):
         kwargs = self.collection.lookup_data_store(uri)
         if not kwargs:
             raise KeyError('Could not match a file store for the uri')
-        path = kwargs['file_store'].get_available_file_path(kwargs['path'])
+        path = kwargs['file_store'].get_available_key(kwargs['path'])
         return path #TODO
 
     def save_file(self, file_obj, uri):
