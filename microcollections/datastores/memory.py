@@ -12,10 +12,10 @@ class MemoryDataStore(BaseDataStore):
             self.collections[collection.name] = dict()
         return self.collections[collection.name]
 
-    def save(self, collection, instance):
+    def save(self, collection, instance, key=None):
         instance = self.execute_hooks('beforeSave',
             {'instance': instance, 'collection': collection})
-        pk = collection.get_object_id(instance)
+        pk = key or collection.get_object_id(instance)
         cstore = self._get_cstore(collection)
         cstore[pk] = collection.get_serializable(instance)
         return self.execute_hooks('afterSave',

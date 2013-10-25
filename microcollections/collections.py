@@ -21,10 +21,6 @@ class CollectionQuery(object):
     def data_store(self):
         return self.collection.data_store
 
-    @property
-    def file_store(self):
-        return self.collection.file_store
-
     def get(self, **params):
         if params:
             return self.clone(**params).get()
@@ -197,9 +193,9 @@ class BaseCollection(CRUDHooks):
         if self.object_id_field:
             if hasattr(instance, '__setitem__'):
                 instance[self.object_id_field] = key
-            else:
+            elif hasattr(instance, self.object_id_field):
                 setattr(instance, self.object_id_field, key)
-        return self.save(instance)
+        return self.save(instance, key)
 
     def __getitem__(self, key):
         return self.get(pk=key)
@@ -252,12 +248,12 @@ class BaseCollection(CRUDHooks):
     def copy(self):
         return dict(self.items())
 
-    def get(self, pk=None, _default=None, **params):
+    def get(self, pk=NotSet, _default=None, **params):
         '''
         Returns a single object matching the query params
         Raises exception if no object matches
         '''
-        if pk is not None:
+        if pk is not NotSet:
             params['pk'] = pk
         try:
             return self.get_query(**params).get()
@@ -299,8 +295,8 @@ class BaseCollection(CRUDHooks):
         instance = self.new(**params)
         return self.save(instance)
 
-    def save(self, instance):
-        return self.data_store.save(self, instance)
+    def save(self, instance, key=None):
+        return self.data_store.save(self, instance, key)
 
     def remove(self, instance):
         return self.data_store.remove(self, instance)

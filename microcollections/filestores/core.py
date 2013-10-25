@@ -24,6 +24,9 @@ class BaseFileStore(BaseDataStore):
         #TODO
         return path
 
+    def uri(self, path):
+        return '://%s' % path
+
     def save_file(self, file_obj, path):
         raise NotImplementedError
 
@@ -36,10 +39,10 @@ class BaseFileStore(BaseDataStore):
     def file_exists(self, path):
         raise NotImplementedError
 
-    def save(self, collection, instance):
+    def save(self, collection, instance, key=None):
         instance = self.execute_hooks('beforeSave',
             {'instance': instance, 'collection': collection})
-        self.save_file(instance, instance.path)
+        self.save_file(instance, key or instance.path)
         return self.execute_hooks('afterSave',
             {'instance': instance, 'collection': collection})
 

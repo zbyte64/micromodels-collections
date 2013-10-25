@@ -13,8 +13,7 @@ class DirectoryFileStore(BaseFileStore):
         self.directory = directory
 
     def save_file(self, file_obj, path):
-        path = secure_filename(path)
-        full_path = os.path.join(self.directory, path)
+        full_path = self.uri(path)
         directory = os.path.split(full_path)[0]
         if not os.path.exists(directory):
             os.makedirs(directory)
@@ -25,16 +24,14 @@ class DirectoryFileStore(BaseFileStore):
         return path
 
     def open_file(self, path, mode='rb'):
-        path = secure_filename(path)
-        full_path = os.path.join(self.directory, path)
-        return open(full_path, mode)
+        return open(self.uri(path), mode)
 
     def delete_file(self, path):
-        path = secure_filename(path)
-        full_path = os.path.join(self.directory, path)
-        os.unlink(full_path)
+        os.unlink(self.uri(path))
 
     def file_exists(self, path):
+        return os.path.exists(self.uri(path))
+
+    def uri(self, path):
         path = secure_filename(path)
-        full_path = os.path.join(self.directory, path)
-        return os.path.exists(full_path)
+        return os.path.join(self.directory, path)

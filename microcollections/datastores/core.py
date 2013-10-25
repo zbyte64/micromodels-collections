@@ -14,7 +14,7 @@ class BaseDataStore(object):
         return self.execute_hooks('afterInitialize',
             {'instance': instance, 'collection': collection})
 
-    def save(self, collection, instance):
+    def save(self, collection, instance, key=None):
         raise UnsupportedOperation
 
     def remove(self, collection, instance):

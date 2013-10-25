@@ -41,7 +41,7 @@ class ProxyFileStore(BaseFileStore):
         if not kwargs:
             raise KeyError('Could not match a file store for the uri')
         path = kwargs['file_store'].get_available_key(kwargs['path'])
-        return path #TODO
+        return kwargs['file_store'].uri(path)
 
     def save_file(self, file_obj, uri):
         kwargs = self.collection.lookup_data_store(uri)
@@ -68,10 +68,10 @@ class ProxyFileStore(BaseFileStore):
             raise KeyError('Could not match a file store for the uri')
         return kwargs['file_store'].file_exists(kwargs['path'])
 
-    def save(self, collection, instance):
+    def save(self, collection, instance, key=None):
         instance = self.execute_hooks('beforeSave',
             {'instance': instance, 'collection': collection})
-        self.save_file(instance, instance.uri)
+        self.save_file(instance, key or instance.uri)
         return self.execute_hooks('afterSave',
             {'instance': instance, 'collection': collection})
 
@@ -85,7 +85,7 @@ class ProxyFileStore(BaseFileStore):
     def get(self, collection, params):
         uri = self._normalize_params(collection, params).get('pk', None)
         if uri is None:
-            raise UnsupportedOperation('Lookups must be by uri')
+            raise UnsupportedOperation('Lookups must be by uri, got: %s' % params)
         if not self.file_exists(uri):
             raise KeyError('URI not found: %s' % uri)
         return {

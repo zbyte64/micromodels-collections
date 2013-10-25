@@ -37,10 +37,10 @@ class HTTPDataStore(BaseDataStore):
     def deserialize_response(self, response):
         return response.json()
 
-    def save(self, collection, instance):
+    def save(self, collection, instance, key=None):
         instance = self.execute_hooks('beforeSave',
             {'instance': instance, 'collection': collection})
-        pk = self.get_object_lookup(collection, instance)
+        pk = key or self.get_object_lookup(collection, instance)
         payload = self.serialize_data(collection.get_serializable(instance))
         if pk:
             self.session.put(self.get_object_url(pk), data=payload)
