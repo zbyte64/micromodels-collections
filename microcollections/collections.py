@@ -355,15 +355,10 @@ class Collection(RawCollection):
 
     def prepare_model(self, model):
         '''
-        Clones the model so that we can set our collection hooks without
-        stepping on other collections with the same model
+        Legacy hook, you shouldn't modify the model, but if you do return a new
+        class
         '''
-        attrs = dict(model.__dict__)
-        attrs['__collection'] = self
-        #I think this will break super(type(self), self)
-        bases = (model,) + model.__bases__
-        c_model = type(model.__name__, bases, attrs)
-        return self.modelRegistered(c_model)
+        return self.modelRegistered(model)
 
     def get_loader(self):
         '''
