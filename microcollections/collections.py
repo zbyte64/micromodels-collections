@@ -310,6 +310,9 @@ class BaseCollection(CRUDHooks):
     def count(self):
         return self.get_query().count()
 
+    def __iter__(self):
+        return self.get_query().__iter__()
+
 
 class RawCollection(BaseCollection):
     '''
