@@ -220,6 +220,10 @@ class BaseCollection(CRUDHooks):
         for key in self.keys():
             yield (key, self.get(key))
 
+    def extend(self, items):
+        for item in items:
+            self.save(item)
+
     def update(self, items):
         for key, value in items.items():
             self[key] = value
@@ -320,10 +324,15 @@ class RawCollection(BaseCollection):
     '''
     object_id_field = 'id'
 
-    def __init__(self, data_store, model=dict, name=None,
+    def __init__(self, data_store=None, model=dict, name=None,
                  object_id_field=None, id_generator=None, params=None):
-        self.model = model
+        if data_store is None:
+            from .datastores import MemoryDataStore
+            data_store = MemoryDataStore
+        if callable(data_store):
+            data_store = data_store
         self.data_store = data_store
+        self.model = model
         self.name = name
         self.params = params or dict()
         if object_id_field:
@@ -348,7 +357,7 @@ class Collection(RawCollection):
     '''
     A collection bound to a schema and returns model instances
     '''
-    def __init__(self, model, data_store, name=None,
+    def __init__(self, model, data_store=None, name=None,
                  object_id_field=None, id_generator=None, params=None):
         if name is None:
             name = model.__name__
