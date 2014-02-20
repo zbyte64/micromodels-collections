@@ -6,7 +6,25 @@ class UnsupportedOperation(Exception):
 
 
 class BaseDataStore(object):
+    def __init__(self):
+        self.subscribers = dict()
+
+    def subsribe(self, topic, callback):
+        self.subscribers.setdefault(topic, []).append(callback)
+
+    def publish(self, topic, message):
+        subscribers = self.subscribers.get(topic)
+        if not subscribers:
+            return
+        message["topic"] = topic
+        #stubs
+        message["action_id"] = None #TODO uuid, useful for versioning
+        message["transaction_id"] = None #TODO
+        for callback in subscribers:
+            callback(message)
+
     def execute_hooks(self, hook, kwargs):
+        self.publish(hook, kwargs)
         return getattr(kwargs.pop('collection'), hook)(**kwargs)
 
     def load_instance(self, collection, result):

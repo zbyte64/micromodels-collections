@@ -339,6 +339,7 @@ class RawCollection(BaseCollection):
             self.object_id_field = object_id_field
         if id_generator:
             self.id_generator = id_generator
+        super(RawCollection, self).__init__()
 
     ## Hooks ##
 
@@ -402,7 +403,7 @@ class Collection(RawCollection):
                 return self.save(instance)
             model.save = save
 
-        return model
+        return super(Collection, self).modelRegistered(model)
 
 
 class PolymorphicLoader(object):
@@ -505,7 +506,6 @@ class PolymorphicCollection(Collection):
         return values.get(self.object_type_field, None)
 
     def afterInitialize(self, instance):
-        instance = super(PolymorphicCollection, self).afterInitialize(instance)
         object_type = self.get_object_type(instance)
         if object_type:
             instance.add_field(self.object_type_field, object_type,
@@ -519,7 +519,7 @@ class PolymorphicCollection(Collection):
                 micromodels.FieldCollectionField(micromodels.CharField()))
         else:
             assert False, 'Why is object types None?'
-        return instance
+        return super(PolymorphicCollection, self).afterInitialize(instance)
 
     def findType(self, cls, **params):
         object_type = self.extract_object_type(cls)
